@@ -49,11 +49,11 @@ extern "C"
         int32_t available_size;
     } otadrive_result;
 
-
     void otadrive_setInfo(char *apiKey, char *current_version);
     otadrive_result otadrive_updateFirmwareInfo();
     otadrive_result otadrive_updateFirmware();
-    esp_err_t otadrive_rollback();
+    char *otadrive_currentversion();
+    bool otadrive_timeTick(uint16_t seconds);
 
     /**
      * @brief convience function to return a string representation of events emited by this library
