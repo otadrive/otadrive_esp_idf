@@ -3,7 +3,7 @@ description: OTA library, the OTAdrive.com SDK library for ESP32 series
 url: https://github.com/otadrive/otadrive_esp_idf
 repository: https://github.com/otadrive/otadrive_esp_idf.git
 documentation: https://otadrive.com/doc/
-
+license: "MIT"
 maintainers:
   - "Mostafa Heidari <mostafa.hk@gmail.com>"
 
