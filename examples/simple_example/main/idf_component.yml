@@ -1,8 +1,8 @@
 ## IDF Component Manager Manifest File
 dependencies:
-  OTAdrive/otadrive_esp_idf:
+  OTAdrive/otadrive_esp:
     version: '*'
-    override_path: '../../..'
+    override_path: 'C:/Projects/IDF/otadrive_esp/'
   ## Required IDF version
   idf:
     version: ">=4.4.0"

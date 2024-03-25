@@ -1,0 +1,16 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.adapterTargetName": "esp32",
+  "idf.flashType": "UART",
+  "idf.portWin": "COM4",
+  "files.associations": {
+    "otadrive_esp.h": "c",
+    "otd_privates.h": "c",
+    "esp_mac.h": "c",
+    "otd_common.h": "c",
+    "esp_https_ota.h": "c",
+    "esp_partition.h": "c",
+    "esp_ota_ops.h": "c",
+    "esp_event.h": "c"
+  }
+}

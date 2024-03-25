@@ -20,13 +20,12 @@ static const char *TAG = "otadrive_idf_example";
 #define EXAMPLE_NETIF_DESC_STA "WiFi-IDF"
 
 // ===== WiFi Credentials
-#define WIFI_SSID "OTAdrive2"
+#define WIFI_SSID "OTAdrive"
 #define WIFI_PASS "@tadr!ve"
-// #define WIFI_SSID   "guest"
-// #define WIFI_PASS   "GTXci7@@!q"
 
 // ===== OTAdrive configurations
-#define OTADRIVE_APIKEY "bd076abe-a423-4880-85b3-4367d07c8eda"
+// Note: Replace your API-key from the otadrive dashboard here (see doc: https://otadrive.com/doc/Product%20Tree#API_key)
+#define OTADRIVE_APIKEY "5ec34eab-c516-496d-8cb0-78dc4744af3b" 
 #define APP_VERSION "v@2.1.1.0"
 
 static esp_netif_t *s_example_sta_netif = NULL;
@@ -74,14 +73,14 @@ static void otadrive_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-void otadrive_test(void *pvParameter)
+void otadrive_thread(void *pvParameter)
 {
     esp_event_handler_register(OTADRIVE_EVENTS, ESP_EVENT_ANY_ID, &otadrive_event_handler, NULL); // Register a handler to get updates on progress
     otadrive_setInfo(OTADRIVE_APIKEY, APP_VERSION);
 
     while (1)
     {
-        if (otadrive_timeTick(60))
+        if (otadrive_timeTick(30))
         {
             otadrive_result r = otadrive_updateFirmwareInfo();
             ESP_LOGI(TAG, "RES %d,%lu", r.code, r.available_size);
@@ -89,7 +88,19 @@ void otadrive_test(void *pvParameter)
             {
                 ESP_LOGI(TAG, "Lets download new firmware %s,%luBytes. Current firmware is %s",
                          r.available_version, r.available_size, otadrive_currentversion());
-                otadrive_updateFirmware();
+                
+                // Note: this method blocks process for about 90 seconds. Be aware about your device operation.
+                r = otadrive_updateFirmware(false);
+                if(r.code == OTADRIVE_Success)
+                {
+                    // lets prepare device for reboot
+                    // shutdown something and kill other threads safely
+                    // ...
+
+                    // now reboot
+                    esp_restart();
+                    return;
+                }
             }
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -98,7 +109,7 @@ void otadrive_test(void *pvParameter)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "app_main start");
+    ESP_LOGI(TAG, "app simple_fota start");
     // Initialize NVS.
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -111,12 +122,10 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-#if CONFIG_EXAMPLE_CONNECT_WIFI
     esp_wifi_set_ps(WIFI_PS_NONE);
     ESP_ERROR_CHECK(example_wifi_connect());
-#endif // CONFIG_EXAMPLE_CONNECT_WIFI
 
-    xTaskCreate(&otadrive_test, "otadrive_example_task", 1024 * 16, NULL, 5, NULL);
+    xTaskCreate(&otadrive_thread, "otadrive_example_task", 1024 * 16, NULL, 5, NULL);
 }
 
 // ========================== Wifi section

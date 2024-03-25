@@ -1,3 +1,5 @@
 {
-    "cmake.configureOnOpen": false
+    "files.associations": {
+        "otadrive_esp.h": "c"
+    }
 }

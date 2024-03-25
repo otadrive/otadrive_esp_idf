@@ -1,85 +1,11 @@
-#include <stdlib.h>
-#include <fnmatch.h>
-#include <libgen.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/event_groups.h>
-#include <esp_http_client.h>
-#include <esp_tls.h>
-#include <esp_crt_bundle.h>
-#include <esp_log.h>
-#include <esp_app_format.h>
-#include <esp_ota_ops.h>
-#include <esp_https_ota.h>
-#include <esp_event.h>
-
-#include <sdkconfig.h>
+#include "otd_common.h"
 #include "otadrive_esp.h"
+#include "otd_privates.h"
 #include "esp_mac.h"
-#include "esp_timer.h"
-
-#define OTADRIVE_CERT "-----BEGIN CERTIFICATE-----\n\
-MIIDuzCCAqOgAwIBAgIDBETAMA0GCSqGSIb3DQEBBQUAMH4xCzAJBgNVBAYTAlBM\n\
-MSIwIAYDVQQKExlVbml6ZXRvIFRlY2hub2xvZ2llcyBTLkEuMScwJQYDVQQLEx5D\n\
-ZXJ0dW0gQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxIjAgBgNVBAMTGUNlcnR1bSBU\n\
-cnVzdGVkIE5ldHdvcmsgQ0EwHhcNMDgxMDIyMTIwNzM3WhcNMjkxMjMxMTIwNzM3\n\
-WjB+MQswCQYDVQQGEwJQTDEiMCAGA1UEChMZVW5pemV0byBUZWNobm9sb2dpZXMg\n\
-Uy5BLjEnMCUGA1UECxMeQ2VydHVtIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MSIw\n\
-IAYDVQQDExlDZXJ0dW0gVHJ1c3RlZCBOZXR3b3JrIENBMIIBIjANBgkqhkiG9w0B\n\
-AQEFAAOCAQ8AMIIBCgKCAQEA4/t9o3K6wvDJFIf1awFO4W5AB7ptJ11/91sts1rH\n\
-UV+rpDKmYYe2bg+G0jACl/jXaVehGDldamR5xgFZrDwxSjh80gTSSyjoIF87B6LM\n\
-TXPb865Px1bVWqeWifrzq2jUI4ZZJ88JJ7ysbnKDHDBy3+Ci6dLhdHUZvSqeexVU\n\
-BBvXQzmtVSjF4hq79MDkrjhJM8x2hZ85RdKknvISjFH4fOQtf/WsX+sWn7Et0brM\n\
-kUJ3TCXJkDhv2/DM+44el1k+1WBO5gUo7Ul5E0u6SNsv+XLTOcr+H9g0cvW0QM8x\n\
-AcPs3hEtF10fuFDRXhmnad4HMyjKUJX5p1TLVIZQRan5SQIDAQABo0IwQDAPBgNV\n\
-HRMBAf8EBTADAQH/MB0GA1UdDgQWBBQIds3LB/8k9sXN7buQvOKEN0Z19zAOBgNV\n\
-HQ8BAf8EBAMCAQYwDQYJKoZIhvcNAQEFBQADggEBAKaorSLOAT2mo/9i0Eidi15y\n\
-sHhE49wcrwn9I0j6vSrEuVUEtRCjjSfeC4Jj0O7eDDd5QVsisrCaQVymcODU0HfL\n\
-I9MA4GxWL+FpDQ3Zqr8hgVDZBqWo/5U30Kr+4rP1mS1FhIrlQgnXdAIv94nYmem8\n\
-J9RHjboNRhx3zxSkHLmkMcScKHQDNP8zGSal6Q10tz6XxnboJ5ajZt3hrvJBW8qY\n\
-VoNzcOSGGtIxQbovvi0TWnZvTuhOgQ4/WwMioBK+ZlgRSssDxLQqKi2WF+A5VLxI\n\
-03YnnZotBqbJ7DnSq9ufmgsnAjUpsUCV5/nonFWIGUbWtzT1fs45mtk48VH3Tyw=\n\
------END CERTIFICATE-----"
-
-#define CONFIG_OTADRIVE_URL_LEN 160
-
-#ifndef CONFIG_OTADRIVE_URL
-#define CONFIG_OTADRIVE_URL "otadrive.com/deviceapi"
-#endif
-
-#ifndef CONFIG_OTADRIVE_HTTPS
-#define CONFIG_OTADRIVE_HTTPS 1
-#endif
-
-#ifndef CONFIG_OTADRIVE_MD5
-#define CONFIG_OTADRIVE_MD5 1
-#endif
-
-static const char *TAG = "OTADRIVE";
 
 ESP_EVENT_DEFINE_BASE(OTADRIVE_EVENTS);
 
-typedef struct otadrive_session_t
-{
-    char apiKey[40];          /*!< The APIkey of the product */
-    char current_version[24]; /*!< Version code of the current firmware */
-    char serial[20];          /*!< Chip serial number */
-    char serverurl[40];       /*!< Base URL of the APIs */
-    char app_md5[40];
-    bool useMd5;
-    bool useHTTPS;
-    struct
-    {
-        char hdr_ver[CONFIG_OTADRIVE_VER_LEN];
-        uint32_t hdr_length;
-    } result;
-
-    TaskHandle_t task_handle;
-    const esp_partition_t *storage_partition;
-} otadrive_session_t;
-typedef struct otadrive_session_t otadrive_session_t;
-static otadrive_session_t otadrv_hdl;
-
+otadrive_session_t otadrv_hdl;
 SemaphoreHandle_t otadrv_lock = NULL;
 
 /*String otadrive_ota::getChipId()
@@ -89,45 +15,13 @@ SemaphoreHandle_t otadrv_lock = NULL;
     return ChipIdHex;
 }*/
 
-static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
-{
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch"
-    switch (evt->event_id)
-    {
-    case HTTP_EVENT_ON_HEADER:
-        ESP_LOGI(TAG, "http hdr %s %s", evt->header_key, evt->header_value);
-        if (strncasecmp(evt->header_key, "X-Version", 20) == 0)
-        {
-            strncpy(otadrv_hdl.result.hdr_ver, evt->header_value, CONFIG_OTADRIVE_VER_LEN);
-        }
-
-        break;
-    case HTTP_EVENT_ON_DATA:
-        // if (!esp_http_client_is_chunked_response(evt->client))
-        // {
-        //     char *buf = evt->data;
-        //     ESP_LOGI(TAG, "http data %s", buf);
-        // }
-        break;
-    case HTTP_EVENT_DISCONNECTED:
-    {
-        int mbedtls_err = 0;
-        esp_err_t err = esp_tls_get_and_clear_last_error(evt->data, &mbedtls_err, NULL);
-        if (err != 0)
-        {
-            ESP_LOGE(TAG, "Last esp error code: 0x%x", err);
-            ESP_LOGE(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
-        }
-        break;
-    }
-    }
-#pragma GCC diagnostic pop
-    return ESP_OK;
-}
+#include <esp_partition.h>
+#include <esp_rom_spiflash.h>
 
 void otadrive_setInfo(char *apiKey, char *current_version)
 {
+    ESP_LOGE(TAG, "MD5 at %s", getSketchMD5String());
+
     if (!otadrv_lock)
         otadrv_lock = xSemaphoreCreateMutex();
     if (xSemaphoreTake(otadrv_lock, pdMS_TO_TICKS(1000)) != pdPASS)
@@ -137,7 +31,8 @@ void otadrive_setInfo(char *apiKey, char *current_version)
     }
 
     ESP_LOGI(TAG, "Initializing");
-    bzero(&otadrv_hdl, sizeof(otadrive_session_t));
+    bzero((void *)&otadrv_hdl, sizeof(otadrive_session_t));
+    otadrv_hdl.running_partition = esp_ota_get_running_partition();
     otadrv_hdl.useHTTPS = CONFIG_OTADRIVE_URL;
     otadrv_hdl.useMd5 = CONFIG_OTADRIVE_MD5;
     snprintf(otadrv_hdl.serverurl, CONFIG_OTADRIVE_URL_LEN, "http%s://%s", otadrv_hdl.useHTTPS ? "s" : "", CONFIG_OTADRIVE_URL);
@@ -170,45 +65,53 @@ otadrive_result otadrive_updateFirmwareInfo()
 
     char url[CONFIG_OTADRIVE_URL_LEN];
     snprintf(url, CONFIG_OTADRIVE_URL_LEN, "%s/update?k=%s&v=%s&s=%s", otadrv_hdl.serverurl, otadrv_hdl.apiKey, otadrv_hdl.current_version, otadrv_hdl.serial);
-    ESP_LOGV(TAG, "Searching for Firmware from %s", url);
+    ESP_LOGI(TAG, "Searching for Firmware from %s", url);
     esp_http_client_config_t httpconfig = {
         .url = url,
         .method = HTTP_METHOD_HEAD,
         .cert_pem = OTADRIVE_CERT,
-        .event_handler = _http_event_handler,
+        .event_handler = otd_http_event_handler,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&httpconfig);
-
+    fill_request_headers(client);
     esp_err_t err = esp_http_client_perform(client);
     if (err == ESP_OK)
     {
         esp_http_client_fetch_headers(client);
+        int status_code;
+        status_code = esp_http_client_get_status_code(client);
 
-        switch (esp_http_client_get_status_code(client))
+        switch (status_code)
         {
         case 200:
             r.available_size = esp_http_client_get_content_length(client);
+            r.code = OTADRIVE_NewFirmwareExists;
             strncpy(r.available_version, otadrv_hdl.result.hdr_ver, CONFIG_OTADRIVE_VER_LEN - 1);
+            break;
             /* FALLTHROUGH */
         case 304:
-        case 401:
-        case 404:
-            r.code = esp_http_client_get_status_code(client);
+            r.code = OTADRIVE_AlreadyUpToDate;
             break;
-        default:
+        case 401:
+            r.code = OTADRIVE_DeviceUnauthorized;
+            break;
+        case 404:
             r.code = OTADRIVE_NoFirmwareExists;
             break;
+        default:
+            r.code = OTADRIVE_Error;
+            break;
         }
-        ESP_LOGI(TAG, "HTTP GET Status = %d", //, content_length = %" PRId64 "",
-                 esp_http_client_get_status_code(client));
+        ESP_LOGI(TAG, "HTTP GET Status = %d, %s", //, content_length = %" PRId64 "",
+                 status_code, esp_err_to_name(status_code));
     }
     else
     {
-        ESP_LOGI(TAG, "HTTP GET Status = %d", err);
+        ESP_LOGE(TAG, "HTTP GET Error = %d", err);
     }
 
-    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
     xSemaphoreGive(otadrv_lock);
 
     return r;
@@ -254,6 +157,7 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 
 static esp_err_t http_client_set_header_cb(esp_http_client_handle_t http_client)
 {
+    fill_request_headers(http_client);
     return esp_http_client_set_header(http_client, "Accept", "application/octet-stream");
 }
 
@@ -310,13 +214,12 @@ esp_err_t _http_event_storage_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-otadrive_result otadrive_updateFirmware()
+otadrive_result otadrive_updateFirmware(bool reboot)
 {
     otadrive_result r;
     int64_t t_break = esp_timer_get_time() + (1000 * 1000 * 30);
     bzero(&r, sizeof(r));
-
-    ESP_LOGI(TAG, "eeee %s ", esp_err_to_name(11));
+    r.code = OTADRIVE_Error;
 
     if (xSemaphoreTake(otadrv_lock, pdMS_TO_TICKS(1000)) != pdTRUE)
     {
@@ -332,7 +235,7 @@ otadrive_result otadrive_updateFirmware()
         .url = url,
         .cert_pem = OTADRIVE_CERT,
         .keep_alive_enable = true,
-        .buffer_size_tx = 4096,
+        //.buffer_size_tx = 4096,
         .timeout_ms = 30000,
     };
 
@@ -340,7 +243,8 @@ otadrive_result otadrive_updateFirmware()
         .http_config = &httpconfig,
         .http_client_init_cb = http_client_set_header_cb,
         .partial_http_download = true,
-        .max_http_request_size = 4096};
+        .max_http_request_size = CONFIG_OTADRIVE_OTA_BUF_SIZE
+        };
 
     esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
@@ -378,7 +282,7 @@ otadrive_result otadrive_updateFirmware()
         err = esp_https_ota_perform(https_ota_handle);
         if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS)
         {
-            ESP_LOGI(TAG, "Error code: %d", err);
+            ESP_LOGE(TAG, "Error code: %d", err);
             break;
         }
 
@@ -407,7 +311,7 @@ otadrive_result otadrive_updateFirmware()
         if ((progress % 5 == 0) && (progress != last_progress))
         {
             ESP_ERROR_CHECK(esp_event_post(OTADRIVE_EVENTS, OTADRIVE_EVENT_FIRMWARE_UPDATE_PROGRESS, &progress, sizeof(progress), portMAX_DELAY));
-            ESP_LOGV(TAG, "Firmware Update Progress: %d%%", progress);
+            ESP_LOGI(TAG, "Firmware Update Progress: %d%%", progress);
             last_progress = progress;
         }
     }
@@ -427,7 +331,9 @@ otadrive_result otadrive_updateFirmware()
             ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
             ESP_ERROR_CHECK(esp_event_post(OTADRIVE_EVENTS, OTADRIVE_EVENT_PENDING_REBOOT, NULL, 0, portMAX_DELAY));
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            esp_restart();
+            if (reboot)
+                esp_restart();
+            r.code = OTADRIVE_Success;
             return r;
         }
         else
@@ -439,6 +345,7 @@ otadrive_result otadrive_updateFirmware()
             ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
             ESP_ERROR_CHECK(esp_event_post(OTADRIVE_EVENTS, OTADRIVE_EVENT_UPDATE_FAILED, NULL, 0, portMAX_DELAY));
             xSemaphoreGive(otadrv_lock);
+            r.code = OTADRIVE_ConnectError;
             return r;
         }
     }
@@ -474,52 +381,4 @@ esp_err_t otadrive_rollback()
     }*/
 
     return ESP_FAIL;
-}
-
-char *otadrive_get_event_str(otadrive_event_e event)
-{
-    switch (event)
-    {
-    case OTADRIVE_EVENT_START_CHECK:
-        return "OTADRIVE_EVENT_START_CHECK";
-    case OTADRIVE_EVENT_UPDATE_AVAILABLE:
-        return "OTADRIVE_EVENT_UPDATE_AVAILABLE";
-    case OTADRIVE_EVENT_NOUPDATE_AVAILABLE:
-        return "OTADRIVE_EVENT_NOUPDATE_AVAILABLE";
-    case OTADRIVE_EVENT_START_UPDATE:
-        return "OTADRIVE_EVENT_START_UPDATE";
-    case OTADRIVE_EVENT_FINISH_UPDATE:
-        return "OTADRIVE_EVENT_FINISH_UPDATE";
-    case OTADRIVE_EVENT_UPDATE_FAILED:
-        return "OTADRIVE_EVENT_UPDATE_FAILED";
-    case OTADRIVE_EVENT_START_STORAGE_UPDATE:
-        return "OTADRIVE_EVENT_START_STORAGE_UPDATE";
-    case OTADRIVE_EVENT_FINISH_STORAGE_UPDATE:
-        return "OTADRIVE_EVENT_FINISH_STORAGE_UPDATE";
-    case OTADRIVE_EVENT_STORAGE_UPDATE_FAILED:
-        return "OTADRIVE_EVENT_STORAGE_UPDATE_FAILED";
-    case OTADRIVE_EVENT_FIRMWARE_UPDATE_PROGRESS:
-        return "OTADRIVE_EVENT_FIRMWARE_UPDATE_PROGRESS";
-    case OTADRIVE_EVENT_STORAGE_UPDATE_PROGRESS:
-        return "OTADRIVE_EVENT_STORAGE_UPDATE_PROGRESS";
-    case OTADRIVE_EVENT_PENDING_REBOOT:
-        return "OTADRIVE_EVENT_PENDING_REBOOT";
-    }
-    return "Unknown Event";
-}
-
-bool otadrive_timeTick(uint16_t seconds)
-{
-    int64_t tickTimestamp = 0;
-    if (esp_timer_get_time() > tickTimestamp)
-    {
-        tickTimestamp = esp_timer_get_time() + ((uint32_t)seconds) * 1000 * 1000;
-        return true;
-    }
-    return false;
-}
-
-char *otadrive_currentversion()
-{
-    return otadrv_hdl.current_version;
 }
