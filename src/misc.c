@@ -94,22 +94,35 @@ uint32_t getFreeSketchSpace()
 uint32_t sketchSize(bool free)
 {
     esp_image_metadata_t data;
-    const esp_partition_t *running = otadrv_hdl.running_partition;
-    if (!running)
-        return 0;
-    const esp_partition_pos_t running_pos = {
-        .offset = running->address,
-        .size = running->size,
-    };
-    data.start_addr = running_pos.offset;
-    esp_image_verify(ESP_IMAGE_VERIFY, &running_pos, &data);
+
+    static uint32_t freeSketch;
+    static uint32_t sketchSize;
+    static bool data_valid = false;
+
+    if (!data_valid)
+    {
+        const esp_partition_t *running = otadrv_hdl.running_partition;
+        if (!running)
+            return 0;
+        const esp_partition_pos_t running_pos = {
+            .offset = running->address,
+            .size = running->size,
+        };
+        data.start_addr = running_pos.offset;
+        esp_image_verify(ESP_IMAGE_VERIFY, &running_pos, &data);
+
+        freeSketch = running_pos.size - data.image_len;
+        sketchSize = data.image_len;
+        data_valid = true;
+    }
+
     if (free)
     {
-        return running_pos.size - data.image_len;
+        return freeSketch;
     }
     else
     {
-        return data.image_len;
+        return sketchSize;
     }
 }
 

@@ -1,4 +1,4 @@
-version: 2.0.1
+version: 2.0.2
 description: OTA library, the OTAdrive.com SDK library for ESP32 series
 url: https://github.com/otadrive/otadrive_esp_idf
 repository: https://github.com/otadrive/otadrive_esp_idf.git
