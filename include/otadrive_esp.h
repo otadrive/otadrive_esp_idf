@@ -56,12 +56,14 @@ extern "C"
     void otadrive_setInfo(char *apiKey, char *current_version);
     otadrive_result otadrive_updateFirmwareInfo();
     otadrive_result otadrive_updateFirmware(bool reboot);
+
+    bool otadrive_downloadConfigValues();
+    bool otadrive_getConfigValue(char *key, char *o_value, int o_maxlen);
+
+    bool otadrive_timeTick(uint16_t seconds);
     char *otadrive_currentversion();
     char *otadrive_getChipId();
-    bool otadrive_timeTick(uint16_t seconds);
-
-    bool downloadConfigValues();
-    bool getConfigValue(char *key, char *o_value, int o_maxlen);
+    void otadrive_setChipId(char *);
 
     /**
      * @brief convience function to return a string representation of events emited by this library

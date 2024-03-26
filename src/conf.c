@@ -5,7 +5,7 @@
 static char *config_buffer = NULL;
 static size_t config_buffer_size = 0;
 
-bool downloadConfigValues()
+bool otadrive_downloadConfigValues()
 {
     if (xSemaphoreTake(otadrv_lock, pdMS_TO_TICKS(1000)) != pdPASS)
     {
@@ -60,7 +60,7 @@ bool downloadConfigValues()
     return success;
 }
 
-bool getConfigValue(char *key, char *o_value, int o_maxlen)
+bool otadrive_getConfigValue(char *key, char *o_value, int o_maxlen)
 {
     if (config_buffer_size == 0)
         return false;

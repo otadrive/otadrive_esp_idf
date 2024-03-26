@@ -75,9 +75,6 @@ static void otadrive_event_handler(void *arg, esp_event_base_t event_base,
 
 void otadrive_thread(void *pvParameter)
 {
-    esp_event_handler_register(OTADRIVE_EVENTS, ESP_EVENT_ANY_ID, &otadrive_event_handler, NULL); // Register a handler to get updates on progress
-    otadrive_setInfo(OTADRIVE_APIKEY, APP_VERSION);
-
     while (1)
     {
         if (otadrive_timeTick(30))
@@ -125,6 +122,9 @@ void app_main(void)
     esp_wifi_set_ps(WIFI_PS_NONE);
     ESP_ERROR_CHECK(example_wifi_connect());
 
+    // initialize OTAdrive lib
+    esp_event_handler_register(OTADRIVE_EVENTS, ESP_EVENT_ANY_ID, &otadrive_event_handler, NULL); // Register a handler to get updates on progress
+    otadrive_setInfo(OTADRIVE_APIKEY, APP_VERSION);
     xTaskCreate(&otadrive_thread, "otadrive_example_task", 1024 * 16, NULL, 5, NULL);
 }
 

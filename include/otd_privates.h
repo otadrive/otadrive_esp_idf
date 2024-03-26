@@ -17,7 +17,7 @@ typedef struct otadrive_session_t
 {
     char apiKey[40];          /*!< The APIkey of the product */
     char current_version[24]; /*!< Version code of the current firmware */
-    char serial[20];          /*!< Chip serial number */
+    char serial[33];          /*!< Chip serial number */
     char serverurl[40];       /*!< Base URL of the APIs */
     char app_md5[40];
     bool useMd5;
