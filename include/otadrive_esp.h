@@ -49,8 +49,9 @@ extern "C"
     typedef struct otadrive_result
     {
         otadrive_result_code code;
-        char available_version[CONFIG_OTADRIVE_VER_LEN];
-        int32_t available_size;
+        char version[CONFIG_OTADRIVE_VER_LEN];
+        int32_t size;
+        bool available;
     } otadrive_result;
 
     void otadrive_setInfo(char *apiKey, char *current_version);

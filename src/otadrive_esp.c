@@ -85,9 +85,10 @@ otadrive_result otadrive_updateFirmwareInfo()
         switch (status_code)
         {
         case 200:
-            r.available_size = esp_http_client_get_content_length(client);
+            r.size = esp_http_client_get_content_length(client);
             r.code = OTADRIVE_NewFirmwareExists;
-            strncpy(r.available_version, otadrv_hdl.result.hdr_ver, CONFIG_OTADRIVE_VER_LEN - 1);
+            r.available = true;
+            strncpy(r.version, otadrv_hdl.result.hdr_ver, CONFIG_OTADRIVE_VER_LEN - 1);
             break;
             /* FALLTHROUGH */
         case 304:
