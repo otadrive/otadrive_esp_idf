@@ -36,7 +36,7 @@ char *otadrive_get_event_str(otadrive_event_e event)
 
 bool otadrive_timeTick(uint16_t seconds)
 {
-    int64_t tickTimestamp = 0;
+    static int64_t tickTimestamp = 0;
     if (esp_timer_get_time() > tickTimestamp)
     {
         tickTimestamp = esp_timer_get_time() + ((uint32_t)seconds) * 1000 * 1000;
