@@ -38,7 +38,7 @@ bool otadrive_downloadConfigValues()
             memcpy(config_buffer, otadrv_hdl.result.body_buffer, otadrv_hdl.result.hdr_length);
             config_buffer_size = otadrv_hdl.result.hdr_length;
 
-            ESP_LOGI(TAG, "Config = %sCEND", config_buffer);
+            ESP_LOGV(TAG, "Config = %sCEND", config_buffer);
             /* FALLTHROUGH */
         case 304:
         case 401:
@@ -67,7 +67,7 @@ bool otadrive_getConfigValue(char *key, char *o_value, int o_maxlen)
     if (config_buffer == NULL)
         return false;
 
-    ESP_LOGI(TAG, "Search in %s for %s", config_buffer, key);
+    ESP_LOGD(TAG, "Search in %s for %s", config_buffer, key);
 
     for (uint32_t i = 0; i < config_buffer_size; i++)
     {
